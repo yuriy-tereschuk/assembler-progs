@@ -8,6 +8,10 @@ _start:
   mov esi, string    ; ponit source string
   stackpush:         ; copy source string in stack
   mov bl, byte [esi]
+  cmp ebx, 61h
+  jl skipuppercase
+  sub ebx, 20h       ; to uppercase
+  skipuppercase:
   push ebx
   inc esi
   loop stackpush     ; end copy in stack
