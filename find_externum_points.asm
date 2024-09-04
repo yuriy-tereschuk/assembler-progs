@@ -143,9 +143,6 @@ minvalue:
     ret
 
 section '.data' writable
-  a db 1
-  b db 2
-  c db 3
   invalid_operation_msg db "Ivaild operation selected, acceptable min:0 or max:1", 0xA, 0
   invalid_operation_msg_len = $ - invalid_operation_msg
   operation_message db "Select externum operation, for min:0, for max:1", 0xA, 0
