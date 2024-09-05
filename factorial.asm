@@ -5,7 +5,7 @@ include 'include/proc32.inc'
 
 interpreter '/lib/ld-linux.so.2'
 needed 'libc.so.6'
-import printf,exit
+import printf,scanf,exit
 
 segment readable executable
 
@@ -20,7 +20,10 @@ _start:
     mov ecx, [lfactorial]
     call print_result
 
+    push eax
+    mov ecx, eax
     call recursion_factorial
+    pop eax
     mov ebx, roperation
     mov ecx, [rfactorial]
     call print_result
@@ -29,16 +32,21 @@ _start:
 
 read_word:
   mov eax, 7
+  cinvoke printf, request_msg
+  cinvoke scanf, request_fmt, base
+  mov eax, [base]
   ret
 
 print_result:
+  push eax
   cinvoke printf, message, ebx, eax, ecx
+  pop eax
   ret
 
 check_input:    ; skip factorial for 0, 1, 2 and negative values
   cmp eax, 2h
   jae L1
-  cinvoke exit
+  cinvoke exit, eax
   L1:
   ret
 
@@ -61,10 +69,17 @@ loop_factorial:
   ret
 
 recursion_factorial:
-  push eax      ; store function argumen
-  mov eax, 0
+  cmp ecx, 1h
+  jg do_recursion
+  mov eax, 1h
+  ret
 
-  pop eax       ; restore args value
+do_recursion:
+  dec ecx
+  call recursion_factorial
+  inc ecx
+  mul ecx
+  mov [rfactorial], eax
   ret
 
 segment readable writable
@@ -72,6 +87,10 @@ segment readable writable
   lfactorial dd 1
   rfactorial dd 1
 
+  base dd 1
+
+  request_msg db "Enter value: ", 0h
+  request_fmt db "%d", 0h
   message db "%s factorial of %d: %d", 0Ah, 0h
   loperation db "Loop", 0h
   roperation db "Recursion", 0h
