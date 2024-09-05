@@ -70,16 +70,12 @@ loop_factorial:
 
 recursion_factorial:
   cmp ecx, 1h
-  jg do_recursion
-  mov eax, 1h
-  ret
-
-do_recursion:
+  je L2
   dec ecx
-  call recursion_factorial
-  inc ecx
-  mul ecx
+  imul ecx
   mov [rfactorial], eax
+  jmp recursion_factorial    ; is it a tail recursion optimization? it looks like loop.
+  L2:
   ret
 
 segment readable writable
