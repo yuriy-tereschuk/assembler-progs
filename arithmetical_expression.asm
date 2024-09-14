@@ -1,3 +1,9 @@
+; External methods from libc used.
+; To build code run fasm and link output object file with i686 gnu compiler.
+; GCC gnu compiler for i386 is available in multilib package gcc-multilib-i686-linux-gnu.
+; fasm arithmetic_expression.asm
+; i686-linux-gnu-gcc arithmetical_expression.o -o arithmetical_expression
+
 format ELF
 
 section '.text' executable
