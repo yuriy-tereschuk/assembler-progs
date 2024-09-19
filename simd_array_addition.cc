@@ -103,7 +103,7 @@ int main(int argc, char** argv)
   timeEnd = std::chrono::steady_clock().now();
   timeDiff = timeEnd - timeStart;
 
-  std::cout << "Sum of scalars takes: " << timeDiff.count() << "ns" << std::endl;
+  std::cout << "Sum of vectors takes: " << timeDiff.count() << "ns" << std::endl;
   std::cout << "Exit." << std::endl;
 
   return EXIT_SUCCESS;
