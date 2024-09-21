@@ -29,7 +29,7 @@ using namespace std;
 using namespace std::chrono;
 
 // GCC SIMD instructions set implementation.
-typedef unsigned int v4si __attribute__ ((vector_size((VEKTOR_LEN)))); // 4 elements of int type at onese
+typedef int v4si __attribute__ ((vector_size((VEKTOR_LEN)))); // 4 elements of int type at onese
 
 /**
 The simple loop iteration generated: 
@@ -78,18 +78,26 @@ movaps  [rbp+var_40], xmm0
 */
 void vector_sum(unsigned int* a, unsigned int* b, unsigned int* c)
 {
-  v4si *aa, *bb, *cc;
+  v4si *p_aa, *p_bb, *p_cc;
 
-  aa = (v4si*) a;
-  bb = (v4si*) b;
-  cc = (v4si*) c;
+  p_aa = (v4si*) a;
+  p_bb = (v4si*) b;
+  p_cc = (v4si*) c;
 
   for (int i = 0; i < ARRAY_SIZE; i+=4) // step on size of vector base 
   {
-    *cc = *aa + *bb;
-    aa++;
-    bb++;
-    cc++;
+    /* Have no idea why compiler placed address from heap into general purpose register 
+     * and then make a copy of data from memory behind address in that register.
+     * Just waste a time...
+     * From compiled code:
+     * mov     eax, [ebp+var_10]
+     * movdqa  xmm0, xmmword ptr ds:(_GLOBAL_OFFSET_TABLE_ - 820DFF4h)[eax]
+     */
+    *p_cc = __builtin_ia32_paddd128(*p_aa, *p_bb);
+
+    p_aa++;
+    p_bb++;
+    p_cc++;
   }
 }
 
