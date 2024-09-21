@@ -5,6 +5,10 @@
 #define ARRAY_SIZE 100000000
 #define VEKTOR_LEN 16
 
+extern "C" {
+  extern void asm_vector_add(unsigned int* a, unsigned int* b, unsigned int* c, int buffer_size);
+}
+
 using namespace std;
 using namespace std::chrono;
 
@@ -58,18 +62,45 @@ movaps  [rbp+var_40], xmm0
 */
 void vector_sum(unsigned int* a, unsigned int* b, unsigned int* c)
 {
-  v4si aa, bb, cc;
-  
-  for (int i = 0; i < (ARRAY_SIZE/VEKTOR_LEN); i++)
+  v4si *aa, *bb, *cc;
+
+  aa = (v4si*) a;
+  bb = (v4si*) b;
+  cc = (v4si*) c;
+
+  for (int i = 0; i < ARRAY_SIZE; i+=4) // step on size of vector base 
   {
-    memcpy(&aa, (a + i), VEKTOR_LEN);
-    memcpy(&bb, (b + i), VEKTOR_LEN);
-
-    cc = aa + bb;
-
-    memcpy((c + i), &cc, VEKTOR_LEN);
+    *cc = *aa + *bb;
+    aa++;
+    bb++;
+    cc++;
   }
 }
+
+void init(unsigned int* a, unsigned int* b, unsigned int* c)
+{
+  std::cout << "Init arrays..." << std::endl;
+  for (unsigned int i = 0; i < ARRAY_SIZE; i++)
+  {
+    *(a + i) = i;
+    *(b + i) = i;
+    *(c + i) = 0;
+  }
+}
+
+void test(unsigned int* c)
+{
+  cout << "Test destination array values: ";
+  for (int i = 0; i < ARRAY_SIZE; i++)
+  {
+    if ((i < 5) || (i > 59999997 && i < 60000003) || (i > (ARRAY_SIZE - 5)))
+    {
+      std::cout << *(c + i) << "; ";
+    }
+  }
+  cout << endl;
+}
+
 
 int main(int argc, char** argv)
 {
@@ -78,13 +109,8 @@ int main(int argc, char** argv)
   unsigned int* b = new unsigned int[ARRAY_SIZE];
   unsigned int* c = new unsigned int[ARRAY_SIZE];
 
-  std::cout << "Init arrays..." << std::endl;
-  for (unsigned int i = 0; i < ARRAY_SIZE; i++)
-  {
-    *(a + i) = i;
-    *(b + i) = i;
-    *(c + i) = 0;
-  }
+  init(a, b, c);
+  test(c);
 
   std::cout << "Sum of scalars..." << std::endl;
   auto timeStart = std::chrono::steady_clock().now();
@@ -95,6 +121,10 @@ int main(int argc, char** argv)
   auto timeDiff = timeEnd - timeStart;
   std::cout << "Sum of scalars takes: " << timeDiff.count() << "ns" << std::endl;
 
+  test(c);
+  init(a, b, c);
+  test(c);
+
   std::cout << "Sum of vectors..." << std::endl;
   
   timeStart = std::chrono::steady_clock().now();
@@ -104,7 +134,26 @@ int main(int argc, char** argv)
   timeDiff = timeEnd - timeStart;
 
   std::cout << "Sum of vectors takes: " << timeDiff.count() << "ns" << std::endl;
+
+  test(c);
+  init(a, b, c);
+  test(c);
+
+  std::cout << "Sum of vectors in assembly..." << std::endl;
+  
+  timeStart = std::chrono::steady_clock().now();
+  
+  asm_vector_add(a, b, c, ARRAY_SIZE/4);
+
+  timeEnd = std::chrono::steady_clock().now();
+  timeDiff = timeEnd - timeStart;
+
+  std::cout << "Sum of vectors in assembly takes: " << timeDiff.count() << "ns" << std::endl;
+
+  test(c);
+
   std::cout << "Exit." << std::endl;
 
   return EXIT_SUCCESS;
 }
+
