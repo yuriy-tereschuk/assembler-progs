@@ -1,3 +1,19 @@
+/* SIMD Basic operation.
+ * Application implements three types of array entries addition.
+ * - simple loop iteration
+ * - GCC vector optimisation
+ * - pure assembly implementation.
+ *
+ * As assembly is implemented for i386 ABI, the CPP entry point
+ * needs to be build for x86 as well.
+ * To build application perform next steps.
+ * - compile assembly implementation as described in assembly file.
+ * - compile without linking CPP: 
+ *   #> i686-linux-gnu-g++ -c simd_array_addition.cc -o simd_array_addition_cc.o
+ * - link object files:
+ *   #> i686-linux-gnu-g++ --static simd_array_addition_cc.o simd_array_addition_asm.o
+ */
+
 #include <iostream>
 #include <cstring>
 #include <chrono>

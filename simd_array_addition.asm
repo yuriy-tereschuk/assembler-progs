@@ -1,3 +1,9 @@
+; SIMD Basic operation.
+; ABI i386
+; To compile use command:
+; #> fasm simd_array_addition.asm simd_array_addition_asm.o
+; Then link it in CPP implemented application.
+
 format ELF
 
 section '.text' executable
