@@ -2,6 +2,8 @@
  * GCC, i686, CPU Vector instructions set AVX.
  * To compile use i686-linux-gnu-g++ compiler with -mavx, -mfma option.
  * For successful linkage i686 under x86_64 use --static option.
+ * #> fasm simd_vector_add_dotprod_calc.asm
+ * #> i686-linux-gnu-g++ simd_vector_add_dotprod_calc.cc -mavx -mfma -static simd_vector_add_dotprod_calc.o
  */
 
 #include <immintrin.h>
@@ -12,6 +14,11 @@
 
 #define ARRAY_SIZE 100000000
 #define ALIGN_BNDR 32
+
+extern "C" {
+  extern void vector_add_asm(int array_size, __m256* mem_a, __m256* mem_b, __m256* mem_c);
+  extern float dot_product_asm(int array_size, __m256* mem_a, __m256* mem_b);
+}
 
 void init(__m32* mem, float mask)
 {
@@ -49,23 +56,31 @@ void scalar_add(__m32* mem_a, __m32* mem_b, __m32* mem_c)
 }
 
 void vector_add(__m256* mem_a, __m256* mem_b, __m256* mem_c)
-{                                        // base type of each element in vector 8th times less then memory addressed by SIMD instruction,
-  for (int i = 0; i < ARRAY_SIZE/8; i++) // so reduce the amount of memory chunks appropriatelly.
-  {
-    *(mem_c + i) = _mm256_add_ps(*(mem_a + i), *(mem_b + i));
+{                                       
+  int vector_size = ARRAY_SIZE * sizeof(__m32); // exact size of array of float type entries
+
+  for (int i = 0; i < vector_size; i += sizeof(__m256)) // base type of each element in vector 8th times less then memory addressed by SIMD instruction,
+  {                                                     // so reduce the amount of memory chunks appropriatelly.
+    *(mem_c++) = _mm256_add_ps(*(mem_a++), *(mem_b++));
   }
 }
 
 float dot_product(__m256* mem_a, __m256* mem_b, __m256* mem_c)
 {
   float dotprod = 0.0;
-  __m256 result = _mm256_setzero_ps(); 
-  __m256 value= _mm256_setzero_ps();
-  for (int i = 0; i < ARRAY_SIZE/8; i++) // see coments in lines 53:54
+  __m256 result = _mm256_setzero_ps();
+
+  int vector_size = ARRAY_SIZE * sizeof(__m32); // exact size of array of float type entries
+
+  for (int i = 0; i < vector_size; i += sizeof(__m256)) // see coments in lines 62:63
   {
-    result = _mm256_fmadd_ps(*(mem_a + i), *(mem_b + i), value); // The description for intrinsic says that 'value' holds intermediated value
-    dotprod += *reinterpret_cast<float*>(&result);               // but such memory block remains unchanged when out from function scope.
-    // *(mem_c + i) = value;                                     
+    result = _mm256_fmadd_ps(*(mem_a++), *(mem_b++), result); 
+  }
+
+  __m32* entry = (__m32*) &result;
+  for (int i = 0; i < (sizeof(__m256)/sizeof(float)); i++) // four bytes for each entry
+  {
+    dotprod += *reinterpret_cast<float*>(entry++);
   }
 
   return dotprod;
@@ -107,8 +122,24 @@ int main(int argc, char** argv)
   end = std::chrono::steady_clock().now();
   duration = end - begin;
   std::cout << "Dot prod = " << result << std::endl;
-  test(mem_c, "Vector C[MUL]:");
   std::cout << "Dot product count takes: " << duration.count() << "ns." << std::endl;
+
+  std::cout << "====== Assembler =====" << std::endl;
+  init(mem_c, 0.0f);
+  begin = std::chrono::steady_clock().now();
+  vector_add_asm(ARRAY_SIZE, (__m256*) mem_a, (__m256*) mem_b, (__m256*) mem_c);
+  end = std::chrono::steady_clock().now();
+  test(mem_c, "Assembly vector add: ");
+  duration = end - begin;
+  std::cout << "Assembly vector add takes: " << duration.count() << "ns." << std::endl;
+
+  init(mem_c, 0.0f);
+  begin = std::chrono::steady_clock().now();
+  result = dot_product_asm(ARRAY_SIZE, (__m256*) mem_a, (__m256*) mem_b);
+  end = std::chrono::steady_clock().now();
+  duration = end - begin;
+  std::cout << "Asemmbly dot prod = " << result << std::endl;
+  std::cout << "Assembly dot product count takes: " << duration.count() << "ns." << std::endl;
 
   return EXIT_SUCCESS;
 }
