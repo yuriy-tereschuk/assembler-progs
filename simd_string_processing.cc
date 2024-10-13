@@ -17,13 +17,13 @@ int get_occurrences_count(const char* base_string, const char* substring, int ba
   int occurrences = 0;
   bool is_ok = true;
 
-  for (int i = 0; i < base_size - sub_size + 1; i++)
+  for (int i = 0; i < base_size; i++)
   {
     for (int j = 0; j < sub_size; j++)
     {
       if (base_string[i+j] != substring[j])
       {
-        is_ok = !is_ok;
+        is_ok = false;
         break;
       }
     }
@@ -31,17 +31,20 @@ int get_occurrences_count(const char* base_string, const char* substring, int ba
     if (is_ok)
     {
       ++occurrences;
-      i += sub_size;
+      i += (sub_size - 1);
     }
     else
     {
-      is_ok = !is_ok;
+      is_ok = true;
     }
   }
 
   return occurrences;
 }
 
+/*
+ * Slow on small amount of data.
+ */
 int _simd_get_occurrences_count(const char* base_string, const char* substring, size_t base_size, size_t sub_size)
 {
   int occurrences = 0;
@@ -50,19 +53,22 @@ int _simd_get_occurrences_count(const char* base_string, const char* substring, 
 
   for (size_t i = 0; i < base_size; i += 32) {
   
-    const __m256i lookup_from_begin = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(base_string + i));
-    const __m256i lookup_after_shift = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(base_string + i + sub_size - 1));
+    const __m256i lookup_from_begin = _mm256_load_si256(reinterpret_cast<const __m256i*>(base_string + i));
+    // unalligned mem load slow down 
+    const __m256i lookup_after_shift = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(base_string + i + sub_size -1));
 
     const __m256i eq_first = _mm256_cmpeq_epi8(first_substring_char, lookup_from_begin);
     const __m256i eq_last = _mm256_cmpeq_epi8(last_substring_char, lookup_after_shift);
     const __m256i all_mask = _mm256_and_si256(eq_first, eq_last);
 
-    uint32_t mask = _mm256_movemask_epi8(all_mask);
-    int pos = 0;
+    uint32_t mask = _mm256_movemask_epi8(all_mask); // compact byte mask into bit mask
+    uint32_t pos = 0;
+    uint8_t tmp = 0;
 
     while (mask != 0)
     {
-      pos = __builtin_ctz(mask) > pos ? __builtin_ctz(mask) : pos; //GCC compiler specific function, returns count of trailing zero bits after right most set bit.
+      tmp = __builtin_ctz(mask); //GCC compiler specific function, returns count of trailing zero bits after right most set bit.
+      pos = tmp > pos ? tmp : pos; 
 
       if (memcmp(base_string + i + pos, substring, sub_size ) == 0)
       {
@@ -79,13 +85,18 @@ int _simd_get_occurrences_count(const char* base_string, const char* substring, 
 
 int main(int argv, char** argc)
 {
-  std::string search_where = "1111000001000111100001111111110000001111";
+  std::string search_where = "000000000100011010000000000000001111000010000001101";
   std::string search_what = "1111";
  
+  for (int i  = 10; i > 0; i--)
+  {
+    search_where.append(search_where);
+  }
+
   char* _search_where;
   const char* _search_what = search_what.c_str();
 
-  posix_memalign((void**) &_search_where, 256, search_where.size() * sizeof(char));
+  posix_memalign((void**) &_search_where, 32, search_where.size() * sizeof(char));
 
   std::copy(search_where.begin(), search_where.end(), _search_where);
    
@@ -102,8 +113,6 @@ int main(int argv, char** argc)
   diff = end - begin;
   
   std::cout << "SIMD, Occurrences count: " << occurrences << "; In time: " << diff.count() << "ns." << std::endl;
-
-
 
   delete[] _search_where;
 
