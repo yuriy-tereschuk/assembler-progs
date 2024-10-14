@@ -1,7 +1,7 @@
 /*
  * Debian Linux, GCC, x86_64
  *
- * Compile: g++ -larmadillo simd_matrix_multiplication.cc
+ * Compile: g++ -larmadillo -mavx2 simd_matrix_multiplication.cc
  */
 
 #include <cstdlib>
@@ -12,9 +12,10 @@
 
 #include <immintrin.h>
 
-#define _M 16
-#define _K 16
-#define _N 16
+// 2 -> 4-> 8 -> 16 -> 32 -> 64 ....
+#define _M 256
+#define _K 256
+#define _N 256
 
 #define MATRIX_A_SIZE (_M * _K) // cols * rows
 #define MATRIX_B_SIZE (_K * _N) // matrix_b_rows = matrix_a_cols
@@ -51,21 +52,27 @@ void matrix_mul(const uint16_t* matrix_a, const uint16_t* matrix_b, uint32_t* ma
 
 void simd_matrix_mul(const uint16_t* matrix_a, const uint16_t* matrix_b, uint32_t* matrix_c)
 {
+  uint32_t prod;
   uint32_t* tmp = (uint32_t*) aligned_alloc(32, 32);
-  for(int i = 0; i < (_M * 16); i+=16)
+  for (int i = 0; i < _M; i++)
   {
-    const __m256i vec_a = _mm256_load_si256(reinterpret_cast<const __m256i*>(matrix_a + i));
-    for(int j = 0; j < (_N * 16); j+=16)
+    for (int j = 0; j < _N; j++)
     {
-      const __m256i vec_b = _mm256_load_si256(reinterpret_cast<const __m256i*>(matrix_b + j));
-      const __m256i vec_c = _mm256_madd_epi16(vec_a, vec_b);
-      const __m256i S1 = _mm256_hadd_epi32(vec_c, _mm256_setzero_si256());
-      const __m256i S2 = _mm256_hadd_epi32(S1, _mm256_setzero_si256());
-      _mm256_stream_si256((__m256i*) tmp, S2);
+      prod = 0;
+      for (int k = 0; k < _N; k+=16)
+      {
+        const __m256i vec_a = _mm256_load_si256(reinterpret_cast<const __m256i*>(matrix_a + (i * k)));
+        const __m256i vec_b = _mm256_load_si256(reinterpret_cast<const __m256i*>(matrix_b + (j * k)));
+        const __m256i vec_c = _mm256_madd_epi16(vec_a, vec_b);
+        const __m256i S1 = _mm256_hadd_epi32(vec_c, _mm256_setzero_si256());
+        const __m256i S2 = _mm256_hadd_epi32(S1, _mm256_setzero_si256());
 
-      uint32_t prod = *((uint32_t*) tmp);
-      prod += *((uint32_t*) tmp + 4);
-
+        _mm256_store_si256((__m256i*) tmp, S2); // furious fast, at least on Haswell.
+        // _mm256_stream_si256((__m256i*) tmp, S2); // increadable slow operation on Haswell arch!
+        prod += *((uint32_t*) tmp);
+        prod += *((uint32_t*) tmp + 4);
+ 
+      }
       _mm_stream_si32((int*) matrix_c, (int) prod);
       matrix_c++;
     }
@@ -126,24 +133,22 @@ int main(int argv, char** argc)
   auto end = std::chrono::steady_clock().now();
   auto duration = end - begin;
   std::cout << "Matrix calculation takes: " << duration.count() << "ns." << std::endl;
-  test(matrix_c);
+  //test(matrix_c);
 
   init(matrix_c, 0);
   
   umat16_t A(matrix_a, _M, _K, false, true), 
            B(matrix_b, _K, _N, false, true);
-  umat32_t C(matrix_c, _M, _N, false, false);
+  umat32_t C(matrix_c, _M, _N, false, true);
   begin = std::chrono::steady_clock().now();
   C = arma::conv_to<umat32_t>::from(A * B);
   end = std::chrono::steady_clock().now();
   duration = end - begin;
   std::cout << "Armadillo Matrix calculation takes: " << duration.count() << "ns." << std::endl;
-  C.print("C:");
+  //test(matrix_c);
 
   uvec16_t Vb  = arma::vectorise(B);
-  
   uint16_t* pVb = Vb.memptr();
-
   init(matrix_c, 0);
 
   begin = std::chrono::steady_clock().now();
@@ -151,10 +156,8 @@ int main(int argv, char** argc)
   end = std::chrono::steady_clock().now();
   duration = end - begin;
   std::cout << "SIMD Matrix calculation takes: " << duration.count() << "ns." << std::endl;
-
   test(matrix_c);
 
   return EXIT_SUCCESS;
 }
-
 
