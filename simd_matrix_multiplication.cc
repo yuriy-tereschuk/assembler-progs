@@ -22,7 +22,7 @@
 #define MATRIX_C_SIZE (_M * _N) // = matrix_a_rows * matrix_b_cols
 
 extern "C" {
-  extern void matrix_mul_asm(const uint16_t* matrix_a, const uint16_t* matrix_b, uint32_t* matrix_c);
+  extern void matrix_mul_asm(const uint16_t* matrix_a, const uint16_t* matrix_b, uint32_t* matrix_c, int rows, int cols);
 }
 
 
@@ -156,6 +156,13 @@ int main(int argv, char** argc)
   end = std::chrono::steady_clock().now();
   duration = end - begin;
   std::cout << "SIMD Matrix calculation takes: " << duration.count() << "ns." << std::endl;
+  //test(matrix_c);
+
+  begin = std::chrono::steady_clock().now();
+  matrix_mul_asm(matrix_a, matrix_b, matrix_c, _M, _K);
+  end = std::chrono::steady_clock().now();
+  duration = end - begin;
+  std::cout << "ASM SIMD Matrix calculation takes: " << duration.count() << "ns." << std::endl;
   test(matrix_c);
 
   return EXIT_SUCCESS;
